@@ -3,19 +3,23 @@ package gorr
 import (
 	"context"
 	"fmt"
-	"github.com/brahma-adshonor/gohook"
-	"github.com/go-redis/redis"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/brahma-adshonor/gohook"
+	"github.com/go-redis/redis"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
-	redisIntValue         = 2334
-	redisFloatValue       = 93.334
-	redisStringValue      = "foo redis value"
-	redisStringSliceValue = []string{"foo redis value", "foo redis value22", "miliao"}
+	redisIntValue             = 2334
+	redisFloatValue           = 93.334
+	redisStringValue          = "foo redis value"
+	redisStringSliceValue     = []string{"foo redis value", "foo redis value22", "miliao"}
+	redisStringStringMapValue = map[string]string{"key1": "value1", "key2": "value2"}
+	redisSliceValue           = []interface{}{"str1", "str2", "str31111111111111111111111"}
+	//redisSliceValue = []interface{}{1, 2, 3}
 )
 
 func stringCmdHookVal(cmd *redis.StringCmd) string {
@@ -66,6 +70,26 @@ func floatCmdHookVal(cmd *redis.FloatCmd) float64 {
 func floatCmdHookResult(cmd *redis.FloatCmd) (float64, error) {
 	fmt.Println("calling hook for testing FloatCmd.Result()")
 	return float64(redisFloatValue), nil
+}
+
+func stringStringMapCmdHookVal(cmd *redis.StringStringMapCmd) map[string]string {
+	fmt.Println("calling hook for testing StringStringMapCmd.Val()")
+	return redisStringStringMapValue
+}
+
+func stringStringMapCmdHookResult(cmd *redis.StringStringMapCmd) (map[string]string, error) {
+	fmt.Println("calling hook for testing StringStringMapCmd.Result()")
+	return redisStringStringMapValue, nil
+}
+
+func sliceCmdHookVal(cmd *redis.SliceCmd) []interface{} {
+	fmt.Println("calling hook for testing SliceCmd.Val()")
+	return redisSliceValue
+}
+
+func sliceCmdHookResult(cmd *redis.SliceCmd) ([]interface{}, error) {
+	fmt.Println("calling hook for testing SliceCmd.Result()")
+	return redisSliceValue, nil
 }
 
 func clientProcessTramplineHook(c *redis.Client, cmd redis.Cmder) error {
@@ -594,4 +618,101 @@ func TestStringSliceCmd(t *testing.T) {
 
 	assert.Equal(t, redisStringSliceValueStored, ret)
 	redisStringSliceValue = redisStringSliceValueStored
+}
+
+func TestSliceCmd(t *testing.T) {
+	setupRedisClusterHook(t)
+
+	defer func() {
+		UnHookRedisFunc()
+	}()
+
+	var sc redis.SliceCmd
+	err := gohook.HookMethod(&sc, "Val", sliceCmdHookVal, nil)
+	err2 := gohook.HookMethod(&sc, "Result", sliceCmdHookResult, nil)
+	if err != nil || err2 != nil {
+		fmt.Printf("hook redis SliceCmd.Val failed, err:%s", err.Error())
+	}
+
+	assert.Nil(t, err)
+
+	c := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:       []string{"127.0.0.0:2333", "127.0.0.1:2333", "127.0.0.2:2333"},
+		Password:    "dummy passwd",
+		DialTimeout: time.Duration(12222) * time.Millisecond,
+		ReadTimeout: time.Duration(44444) * time.Millisecond,
+		PoolSize:    128,
+	})
+
+	assert.NotNil(t, c)
+
+	c.MGet("mget")
+
+	redisSliceValueStored := redisSliceValue
+	redisSliceValue = []interface{}{1, 2, 4}
+	gohook.UnHookMethod(&sc, "Val")
+	gohook.UnHookMethod(&sc, "Result")
+
+	gohook.UnHook(redisClusterClientProcessTrampoline)
+	UnHookRedisFunc()
+
+	GlobalMgr.SetState(RegressionReplay)
+	err3 := HookRedisFunc()
+	if err3 != nil {
+		fmt.Printf("hook redis failed, err:%s", err3.Error())
+	}
+
+	assert.Nil(t, err3)
+	cmd := c.MGet("mget")
+	ret := cmd.Val()
+	assert.Equal(t, redisSliceValueStored, ret)
+	redisSliceValue = redisSliceValueStored
+}
+func TestStringStringMapCmd(t *testing.T) {
+	setupRedisClusterHook(t)
+
+	defer func() {
+		UnHookRedisFunc()
+	}()
+
+	var sc redis.StringStringMapCmd
+	err := gohook.HookMethod(&sc, "Val", stringStringMapCmdValue, nil)
+	err2 := gohook.HookMethod(&sc, "Result", stringStringMapCmdHookResult, nil)
+	if err != nil || err2 != nil {
+		fmt.Printf("hook redis SliceCmd.Val failed, err:%s", err.Error())
+	}
+
+	assert.Nil(t, err)
+
+	c := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:       []string{"127.0.0.0:2333", "127.0.0.1:2333", "127.0.0.2:2333"},
+		Password:    "dummy passwd",
+		DialTimeout: time.Duration(12222) * time.Millisecond,
+		ReadTimeout: time.Duration(44444) * time.Millisecond,
+		PoolSize:    128,
+	})
+
+	assert.NotNil(t, c)
+
+	c.HGetAll("hgetall")
+
+	redisStringStringMapValueStored := redisStringStringMapValue
+	redisStringStringMapValue = map[string]string{"key1": "value1", "key2": "value2"}
+	gohook.UnHookMethod(&sc, "Val")
+	gohook.UnHookMethod(&sc, "Result")
+
+	gohook.UnHook(redisClusterClientProcessTrampoline)
+	UnHookRedisFunc()
+
+	GlobalMgr.SetState(RegressionReplay)
+	err3 := HookRedisFunc()
+	if err3 != nil {
+		fmt.Printf("hook redis failed, err:%s", err3.Error())
+	}
+	assert.Nil(t, err3)
+
+	cmd := c.HGetAll("hgetall")
+	ret := cmd.Val()
+	assert.Equal(t, redisStringStringMapValueStored, ret)
+	redisStringStringMapValue = redisStringStringMapValueStored
 }

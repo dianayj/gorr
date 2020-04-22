@@ -52,6 +52,10 @@ func buildRedisCmdKey(id string, cmd redis.Cmder) string {
 		ss = append(ss, "BoolCmd@")
 	case *redis.StringSliceCmd:
 		ss = append(ss, "StringSliceCmd@")
+	case *redis.SliceCmd:
+		ss = append(ss, "SliceCmd@")
+	case *redis.StringStringMapCmd:
+		ss = append(ss, "StringStringMapCmd@")
 	default:
 		// panic("not supported redis cmd type")
 		ss = append(ss, cmd.Name())
@@ -99,6 +103,32 @@ func saveRedisCmdValue(key string, cmd redis.Cmder) {
 			binary.Write(&buff, binary.LittleEndian, int32(len(v)))
 			binary.Write(&buff, binary.LittleEndian, []byte(v))
 		}
+	case *redis.SliceCmd:
+		var val []interface{}
+		val, err = c.Result()
+		// 存储格式： slice长度，类型字符串长度，类型字符串，元素长度，元素
+		binary.Write(&buff, binary.LittleEndian, int32(len(val)))
+		if len(val) > 0 {
+			elemType := reflect.TypeOf(val[0]).String()
+			binary.Write(&buff, binary.LittleEndian, int32(len(elemType)))
+			binary.Write(&buff, binary.LittleEndian, []byte(elemType))
+		}
+
+		for _, v := range val {
+			scd, _ := marshalValue(v)
+			binary.Write(&buff, binary.LittleEndian, int32(len(scd)))
+			binary.Write(&buff, binary.LittleEndian, scd)
+		}
+	case *redis.StringStringMapCmd:
+		var val map[string]string
+		val, err = c.Result()
+		binary.Write(&buff, binary.LittleEndian, int32(len(val)))
+		for k, v := range val {
+			binary.Write(&buff, binary.LittleEndian, int32(len(k)))
+			binary.Write(&buff, binary.LittleEndian, []byte(k))
+			binary.Write(&buff, binary.LittleEndian, int32(len(v)))
+			binary.Write(&buff, binary.LittleEndian, []byte(v))
+		}
 	default:
 		GlobalMgr.notifier("redis cmd recording for not-supported cmd", key, []byte(""))
 		return
@@ -130,6 +160,12 @@ func addKeyToRedisCmd(cmd redis.Cmder, key string) {
 		arg := c.Args()
 		arg[0] = key
 	case *redis.StringSliceCmd:
+		arg := c.Args()
+		arg[0] = key
+	case *redis.SliceCmd:
+		arg := c.Args()
+		arg[0] = key
+	case *redis.StringStringMapCmd:
 		arg := c.Args()
 		arg[0] = key
 	default:

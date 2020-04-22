@@ -266,10 +266,14 @@ var (
 		CmdValue{&redis.StringCmd{}, "Val", stringCmdValue, nil},
 		CmdValue{&redis.StatusCmd{}, "Val", statusCmdValue, nil},
 		CmdValue{&redis.StringSliceCmd{}, "Val", stringSliceCmdValue, nil},
+		CmdValue{&redis.SliceCmd{}, "Val", sliceCmdValue, nil},
+		CmdValue{&redis.StringStringMapCmd{}, "Val", stringStringMapCmdValue, nil},
 
 		CmdValue{&redis.StringCmd{}, "Result", stringCmdResult, nil},
 		CmdValue{&redis.StatusCmd{}, "Result", statusCmdResult, nil},
 		CmdValue{&redis.StringSliceCmd{}, "Result", stringSliceCmdResult, nil},
+		CmdValue{&redis.SliceCmd{}, "Result", sliceCmdResult, nil},
+		CmdValue{&redis.StringStringMapCmd{}, "Result", stringStringMapCmdResult, nil},
 	}
 )
 
