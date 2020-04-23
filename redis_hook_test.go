@@ -18,8 +18,7 @@ var (
 	redisStringValue          = "foo redis value"
 	redisStringSliceValue     = []string{"foo redis value", "foo redis value22", "miliao"}
 	redisStringStringMapValue = map[string]string{"key1": "value1", "key2": "value2"}
-	redisSliceValue           = []interface{}{"str1", "str2", "str31111111111111111111111"}
-	//redisSliceValue = []interface{}{1, 2, 3}
+	redisSliceValue           = []interface{}{"str1", 2, nil}
 )
 
 func stringCmdHookVal(cmd *redis.StringCmd) string {

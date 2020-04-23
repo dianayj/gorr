@@ -106,18 +106,29 @@ func saveRedisCmdValue(key string, cmd redis.Cmder) {
 	case *redis.SliceCmd:
 		var val []interface{}
 		val, err = c.Result()
-		// 存储格式： slice长度，类型字符串长度，类型字符串，元素长度，元素
+		// 存储格式： slice长度； 类型字符串长度，类型字符串，元素长度，元素；
 		binary.Write(&buff, binary.LittleEndian, int32(len(val)))
-		if len(val) > 0 {
-			elemType := reflect.TypeOf(val[0]).String()
-			binary.Write(&buff, binary.LittleEndian, int32(len(elemType)))
-			binary.Write(&buff, binary.LittleEndian, []byte(elemType))
-		}
 
 		for _, v := range val {
-			scd, _ := marshalValue(v)
-			binary.Write(&buff, binary.LittleEndian, int32(len(scd)))
-			binary.Write(&buff, binary.LittleEndian, scd)
+			var elemType string
+			var tLen int32
+			if v != nil {
+				elemType = reflect.TypeOf(v).String()
+				tLen = int32(len(elemType))
+				binary.Write(&buff, binary.LittleEndian, tLen)
+				binary.Write(&buff, binary.LittleEndian, []byte(elemType))
+				scd, _ := marshalValue(v)
+				binary.Write(&buff, binary.LittleEndian, int32(len(scd)))
+				binary.Write(&buff, binary.LittleEndian, scd)
+			} else {
+				elemType = "nil"
+				tLen = int32(len(elemType))
+				binary.Write(&buff, binary.LittleEndian, tLen)
+				binary.Write(&buff, binary.LittleEndian, []byte(elemType))
+				// 方便统一处理，nil类型存字符串"nil"
+				binary.Write(&buff, binary.LittleEndian, tLen)
+				binary.Write(&buff, binary.LittleEndian, []byte(elemType))
+			}
 		}
 	case *redis.StringStringMapCmd:
 		var val map[string]string

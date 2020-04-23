@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/go-redis/redis"
 )
@@ -219,28 +220,26 @@ func sliceCmdResult(cmd *redis.SliceCmd) ([]interface{}, error) {
 	if err3 != nil {
 		return ret, errors.New("read size of slice from buffer failed")
 	}
-
 	sz -= 4
-
-	// 获取元素类型长度
-	var tlen int32
-	err4 := binary.Read(&buff, binary.LittleEndian, &tlen)
-	if err4 != nil {
-		return ret, errors.New("read size of type from buffer failed")
-	}
-	sz -= 4
-
-	// 获取元素类型
-	tname := make([]byte, tlen)
-	err5 := binary.Read(&buff, binary.LittleEndian, tname)
-	if err5 != nil {
-		return ret, errors.New("read type string from buffer failed")
-	}
-
-	sz -= int(tlen)
 
 	// 依次获取元素
 	for i := 0; i < int(slen); i++ {
+		// 获取元素类型长度
+		var tlen int32
+		err4 := binary.Read(&buff, binary.LittleEndian, &tlen)
+		if err4 != nil {
+			return ret, errors.New("read size of type from buffer failed")
+		}
+		sz -= 4
+		// 获取元素类型
+		tname := make([]byte, tlen)
+		err5 := binary.Read(&buff, binary.LittleEndian, tname)
+		if err5 != nil {
+			return ret, errors.New("read type string from buffer failed")
+		}
+
+		sz -= int(tlen)
+
 		var sz2 int32
 		err := binary.Read(&buff, binary.LittleEndian, &sz2)
 		if err != nil || sz2 < 0 || int(sz2) > sz-4 {
@@ -257,15 +256,18 @@ func sliceCmdResult(cmd *redis.SliceCmd) ([]interface{}, error) {
 		// 根据类型获取值
 		ud, _ := getValueByTypeName(string(tname), data)
 		sz -= int(sz2)
-
+		fmt.Printf("=== true item value: %v\n", ud)
 		ret = append(ret, ud)
 	}
+
 	return ret, nil
 }
 
 func getValueByTypeName(name string, data []byte) (interface{}, error) {
 	var err error
 	switch name {
+	case "nil":
+		return nil, nil
 	case "string":
 		var s string
 		err = unmarshalValue(data, &s)
